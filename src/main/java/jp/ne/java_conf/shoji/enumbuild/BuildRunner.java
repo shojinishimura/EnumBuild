@@ -1,80 +1,72 @@
 package jp.ne.java_conf.shoji.enumbuild;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class BuildRunner {
 
-    private final Target[] goals;
+    public BuildRunner() {
 
-    public BuildRunner(Target goal) {
-        this.goals = new Target[] { goal };
     }
 
-    public BuildRunner(Target... goals) {
-        this.goals = goals;
+    public void run(Target... goals) {
+        try {
+            setUp();
+            List<Target> invokeOrder = resolveInvokeOrder(goals);
+            for (Target target : invokeOrder) {
+                invoke(target);
+            }
+        } finally {
+            tearDown();
+        }
     }
 
-    public static void run(Target goal) {
-        new BuildRunner(goal).invoke();
-    }
-    
-    public static void run(Target...goals) {
-        new BuildRunner(goals).invoke();
+    protected void setUp() {
+
     }
 
-    public void invoke() {
-        invoke(goals);
+    protected void tearDown() {
+
     }
 
-    private List<Target> invoked = new ArrayList<Target>();
-    private List<Target> visited = new ArrayList<Target>();
-
-    private boolean isVisited(Target target) {
-        return visited.contains(target);
+    protected void invoke(Target target) {
+        target.action();
     }
 
-    private boolean isInvoked(Target target) {
-        return invoked.contains(target);
+    protected List<Target> resolveInvokeOrder(Target... goals) {
+        return resolveInvokeOrderHelper(goals, new ArrayList<Target>(),
+                new HashSet<Target>());
     }
 
-    protected void invoke(Target goal) {
-        if (goal == null) {
-            throw new IllegalArgumentException("Target is null: "
-                    + invokedList());
+    private List<Target> resolveInvokeOrderHelper(Target target,
+            List<Target> invokeOrder, Set<Target> knownTargets) {
+        if (target == null) {
+            throw new IllegalArgumentException("target is null");
         }
 
-        if (isVisited(goal) && !isInvoked(goal)) {
-            throw new IllegalStateException(
+        if (knownTargets.contains(target) && !invokeOrder.contains(target)) {
+            throw new AssertionError(
                     String
                             .format(
-                                    "Cycric Dependency Detected: current target %1$s, invokeLiks %2$s",
-                                    goal, invokedList()));
+                                    "Cyclic Dependency Detected: target %1$s, invoke order %2$s",
+                                    target, invokeOrder));
         }
-        visited.add(goal);
+        knownTargets.add(target);
 
-        invoke(goal.depends());
+        resolveInvokeOrderHelper(target.depends(), invokeOrder, knownTargets);
+        invokeOrder.add(target);
 
-        if (!invoked.contains(goal)) {
-            goal.action();
-            invoked.add(goal);
-        }
+        return invokeOrder;
     }
 
-    protected void invoke(Target... goals) {
-        for (Target target : goals) {
-            invoke(target);
+    private List<Target> resolveInvokeOrderHelper(Target[] targets,
+            List<Target> invokeOrder, Set<Target> knownTargets) {
+        for (Target target : targets) {
+            resolveInvokeOrderHelper(target, invokeOrder, knownTargets);
         }
+        return invokeOrder;
     }
 
-    private String invokedList() {
-        StringBuilder sb = new StringBuilder();
-        for (Target target : invoked) {
-            if (sb.length() != 0) {
-                sb.append(",");
-            }
-            sb.append(target);
-        }
-        return sb.toString();
-    }
 }
